@@ -1,28 +1,142 @@
 {
   "en-GB": {
-    "shell": { "nav": { "example": "Notice board" } },
-    "example": {
-      "title": "Notice board",
-      "desc": "Short notes for the whole club",
-      "placeholder": "Write a note…",
-      "add": "Post note",
-      "saved": "Note posted",
-      "delete": "Delete note",
-      "loading": "Loading…",
-      "empty": "No notes yet."
+    "shell": {
+      "nav": {
+        "payments": "Online payments"
+      }
+    },
+    "roles": {
+      "perms": {
+        "payments_account_manage": "Connect Stripe and see online payments"
+      }
+    },
+    "payments": {
+      "pay": "Pay online",
+      "title": "Online payments",
+      "desc": "Members pay their invoices by card or TWINT. The money goes straight to the club's Stripe account, and the invoice is marked paid.",
+      "noPlatform": "Online payments are not set up on this platform yet. The platform operator adds the Stripe key in manage › Payments.",
+      "stripeAccount": "Stripe account",
+      "testMode": "Test mode",
+      "notConnected": "No Stripe account connected yet. Connect the club's account, or create one on the way: Stripe asks for the club's details and bank account.",
+      "readyText": "Members can pay their open invoices online.",
+      "reviewText": "Stripe is checking the club's details. Members can pay as soon as Stripe allows payments.",
+      "setupText": "The setup at Stripe isn't finished yet.",
+      "flag": {
+        "charges": "Payments",
+        "card": "Card",
+        "twint": "TWINT"
+      },
+      "twintHint": "TWINT is not active yet: turn it on in the club's Stripe dashboard under Settings › Payment methods.",
+      "checkedAt": "checked {{at}}",
+      "fee": "Platform fee: {{percent}} % of each payment, on top of Stripe's fees.",
+      "check": "Check",
+      "checked": "Account checked",
+      "connect": "Connect Stripe",
+      "continueSetup": "Continue setup",
+      "disconnect": "Disconnect",
+      "disconnected": "Stripe disconnected",
+      "disconnectTitle": "Disconnect Stripe?",
+      "disconnectBody": "Members can no longer pay online, and payment pages still open are ended. The Stripe account and its money stay the club's; you can connect it again later.",
+      "loadFailed": "Online payments could not be loaded.",
+      "listTitle": "Payments",
+      "emptyTitle": "No online payments yet",
+      "emptyDesc": "When a member pays an invoice online it shows up here.",
+      "col": {
+        "date": "Date",
+        "invoice": "Invoice",
+        "member": "Member",
+        "method": "Method",
+        "status": "Status",
+        "amount": "Amount"
+      },
+      "state": {
+        "open": "Open",
+        "paid": "Paid",
+        "expired": "Ended"
+      },
+      "method": {
+        "card": "Card",
+        "twint": "TWINT"
+      },
+      "return": {
+        "paidTitle": "Thank you!",
+        "paidBody": "CHF {{amount}} for invoice {{invoice}} is paid.",
+        "openTitle": "Payment not confirmed yet",
+        "openBody": "Stripe hasn't confirmed the payment yet. The invoice is marked paid as soon as it does; you don't need to pay again.",
+        "cancelledTitle": "Payment cancelled",
+        "cancelledBody": "Nothing was paid. You can pay the invoice later.",
+        "back": "Back to my overview"
+      }
     }
   },
   "de-CH": {
-    "shell": { "nav": { "example": "Pinnwand" } },
-    "example": {
-      "title": "Pinnwand",
-      "desc": "Kurze Notizen für den ganzen Verein",
-      "placeholder": "Notiz schreiben …",
-      "add": "Notiz posten",
-      "saved": "Notiz gepostet",
-      "delete": "Notiz löschen",
-      "loading": "Wird geladen …",
-      "empty": "Noch keine Notizen."
+    "shell": {
+      "nav": {
+        "payments": "Online-Zahlungen"
+      }
+    },
+    "roles": {
+      "perms": {
+        "payments_account_manage": "Stripe verbinden und Online-Zahlungen sehen"
+      }
+    },
+    "payments": {
+      "pay": "Online bezahlen",
+      "title": "Online-Zahlungen",
+      "desc": "Mitglieder bezahlen ihre Rechnungen mit Karte oder TWINT. Das Geld geht direkt auf das Stripe-Konto des Vereins, und die Rechnung wird als bezahlt markiert.",
+      "noPlatform": "Online-Zahlungen sind auf dieser Plattform noch nicht eingerichtet. Der Betreiber trägt den Stripe-Schlüssel in manage › Zahlungen ein.",
+      "stripeAccount": "Stripe-Konto",
+      "testMode": "Testmodus",
+      "notConnected": "Noch kein Stripe-Konto verbunden. Verbinde das Konto des Vereins oder eröffne unterwegs eines: Stripe fragt nach den Angaben und dem Bankkonto des Vereins.",
+      "readyText": "Mitglieder können ihre offenen Rechnungen online bezahlen.",
+      "reviewText": "Stripe prüft die Angaben des Vereins. Mitglieder können zahlen, sobald Stripe Zahlungen erlaubt.",
+      "setupText": "Die Einrichtung bei Stripe ist noch nicht abgeschlossen.",
+      "flag": {
+        "charges": "Zahlungen",
+        "card": "Karte",
+        "twint": "TWINT"
+      },
+      "twintHint": "TWINT ist noch nicht aktiv: im Stripe-Dashboard des Vereins unter Einstellungen › Zahlungsmethoden einschalten.",
+      "checkedAt": "geprüft {{at}}",
+      "fee": "Plattformgebühr: {{percent}} % jeder Zahlung, zusätzlich zu den Stripe-Gebühren.",
+      "check": "Prüfen",
+      "checked": "Konto geprüft",
+      "connect": "Stripe verbinden",
+      "continueSetup": "Einrichtung fortsetzen",
+      "disconnect": "Trennen",
+      "disconnected": "Stripe getrennt",
+      "disconnectTitle": "Stripe trennen?",
+      "disconnectBody": "Mitglieder können dann nicht mehr online zahlen, und noch offene Zahlungsseiten werden beendet. Das Stripe-Konto und sein Geld bleiben beim Verein; du kannst es später wieder verbinden.",
+      "loadFailed": "Die Online-Zahlungen konnten nicht geladen werden.",
+      "listTitle": "Zahlungen",
+      "emptyTitle": "Noch keine Online-Zahlungen",
+      "emptyDesc": "Bezahlt ein Mitglied eine Rechnung online, erscheint die Zahlung hier.",
+      "col": {
+        "date": "Datum",
+        "invoice": "Rechnung",
+        "member": "Mitglied",
+        "method": "Zahlungsart",
+        "status": "Status",
+        "amount": "Betrag"
+      },
+      "state": {
+        "open": "Offen",
+        "paid": "Bezahlt",
+        "expired": "Beendet"
+      },
+      "method": {
+        "card": "Karte",
+        "twint": "TWINT"
+      },
+      "return": {
+        "paidTitle": "Danke!",
+        "paidBody": "CHF {{amount}} für Rechnung {{invoice}} sind bezahlt.",
+        "openTitle": "Zahlung noch nicht bestätigt",
+        "openBody": "Stripe hat die Zahlung noch nicht bestätigt. Die Rechnung wird als bezahlt markiert, sobald das geschieht; du musst nicht nochmals zahlen.",
+        "cancelledTitle": "Zahlung abgebrochen",
+        "cancelledBody": "Es wurde nichts bezahlt. Du kannst die Rechnung später bezahlen.",
+        "back": "Zurück zu meiner Übersicht"
+      }
     }
   }
 }

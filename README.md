@@ -1,101 +1,63 @@
-# Hubra plugin template
+# Online payments (Hubra plugin)
 
-Start a new [Hubra](https://hubra.club) plugin from here. The template is a
-small plugin that works and uses every part a plugin has: a notice board
-with one table, an API, a screen in the club app, a module setting, a
-migration, tests, and the workflow that tests, signs and releases it.
+Members pay their invoices online, by card or TWINT. Each club connects its
+**own Stripe account** to the platform's (Stripe Connect, a Standard
+account): the money goes straight to the club, Stripe takes its fees from
+the club, and the invoice is marked paid by itself, which completes its
+income transaction like a bank payment would.
 
-**Plugin id** `example` · **Package** `hubra_example` · **Module** `example` · **Works with** Hubra `>=0.2,<1`
+**Plugin id** `payments` · **Package** `hubra_payments` · **Module** `payments` · **Needs** the `members` and `finance` modules, Hubra with the `invoice.actions` slot
 
-## Make a new plugin
+![Open invoices with "Online bezahlen"](docs/screenshots/pay-account.png)
 
-1. **Create the repository.** Click **Use this template** and name it
-   `hubra-plugin-<id>` in `hubra-app`. The Marketplace
-   ([hubra-app/hubra-plugins](https://github.com/hubra-app/hubra-plugins))
-   lists every public `hubra-plugin-*` repository there once it has a release.
-2. **Rename everything called example.** Use the same name in every place:
+## Set up
 
-   | Where | Example | Yours |
-   | --- | --- | --- |
-   | `plugin.yaml` `id`, `name`, `description`, `homepage`, `tags` | `example` | `<id>` |
-   | Package folder and `package:` (must start with `hubra_`) | `hubra_example` | `hubra_<name>` |
-   | Module code (`plugin.yaml` `modules:`, `Module(code=...)`, `module:` in `frontend/src/index.tsx`) | `example` | must not clash with a Hubra module |
-   | Blueprint name, which sets the permission prefix | `example_bp` gives `example.notes.read` | `<name>_bp` |
-   | Table names, in `models.py`, `tables=` and the migration | `example_notes` | prefix them with your id |
-   | API path | `/api/v1/app/example` | `/api/v1/app/<id>` (the club area; plugins cannot add platform or global routes) |
-   | Club-app route and nav entry | `/app/example` | |
-   | Translations (`shell.nav.example`, `example.*`) | | |
+1. **Platform** (once, manage › Payments): the platform's Stripe secret key
+   (`sk_test_…` for test mode, `sk_live_…` for real money), and optionally a
+   platform fee in percent. Connect must be turned on in the platform's
+   Stripe dashboard.
+2. **Club** (Weitere › Online-Zahlungen, permission
+   `payments.account.manage`): **Stripe verbinden** creates the club's
+   Stripe account and opens Stripe's setup, where the club enters its details
+   and bank account. Back in Hubra the page shows whether Stripe allows
+   payments yet, and whether card and TWINT are active. TWINT is turned on in
+   the club's own Stripe dashboard (Settings › Payment methods).
+3. **Members** see **Online bezahlen** next to each of their open invoices
+   (Dashboard › Persönlich, and the invoice page). Stripe Checkout offers the
+   payment methods the club turned on.
 
-   Then replace the migration with your own (`0a1b2c3d4e5f_example_notes.py`)
-   and set `version: "1.0.0"` and the first `CHANGELOG.md` entry.
-3. **Set up the repository** (Settings):
-   - **Rules › Rulesets › Import a ruleset:** import both files from
-     [`.github/rulesets/`](.github/rulesets/). `main.json` protects `main`
-     (pull request, required check `test`, no force push or delete);
-     `tags.json` makes `v*` tags permanent once published.
-   - **Environments › New environment** `plugin-signing`: add the secret
-     `HUBRA_SIGNING_KEY` (the official plugin key; never a repository or
-     organisation secret), add yourself as required reviewer, and limit
-     deployment to tags `v*`.
-   - Optional repository secret `MARKETPLACE_TOKEN` (Actions: write on
-     hubra-app/hubra-plugins), so a release is listed at once instead of
-     within the hour.
-   - **Code security:** turn on secret scanning, push protection and private
-     vulnerability reporting.
+![The club's Stripe account and its payments](docs/screenshots/pay-admin.png)
 
-## Layout
+## How a payment is booked
 
-```
-plugin.yaml              # id, version, Hubra range, package, modules, requires
-hubra_example/
-  __init__.py            # module = Module(...): blueprint, nav entry, setting, tables
-  models.py              # SQLAlchemy models (one copy per club schema)
-  routes.py              # the API, with permission_required(...)
-migrations/              # Alembic revisions of this plugin only
-frontend/src/
-  index.tsx              # registerPlugin({...}): routes, icons, translations
-  NotesScreen.tsx        # the screen
-  api.ts                 # calls to the plugin's API
-  translations.json      # en-GB and de-CH
-tests/test_example.py    # runs with Hubra's pytest fixtures
-CHANGELOG.md             # "## <version>" sections, shown before updating
-.releaseignore           # kept out of the release zip
-.github/workflows/release.yml
-.github/rulesets/        # importable rulesets for main and v* tags
-```
+Stripe can't send Connect webhooks to one club, so Hubra asks Stripe:
 
-What a plugin can do (settings, event hooks, Celery tasks, tabs on built-in
-screens, slots, connected apps) is in
-[plugins/README.md](https://github.com/hubra-app/hubra/blob/main/plugins/README.md)
-and [hubra/modules/README.md](https://github.com/hubra-app/hubra/blob/main/app/backend/hubra/modules/README.md).
-[hubra-plugin-keys](https://github.com/hubra-app/hubra-plugin-keys) is a
-bigger real plugin to compare with.
+- when the member comes back from Checkout (`/app/payments/return`), and
+- every ten minutes for checkouts still open (`hubra_payments.tasks.sync_open`).
+
+A paid checkout marks the invoice paid only when the amount and currency
+match. An open checkout is used again while it has more than ten minutes
+left; if the invoice amount changed, the member gets a new one. Checkouts end
+after 24 hours (Stripe's limit). Disconnecting Stripe ends open checkouts;
+the Stripe account and its money stay the club's.
+
+Refunds are made in the club's Stripe dashboard; mark the invoice open again
+in Hubra if needed.
+
+## API
+
+`/api/v1/app/payments`: `GET /status`, `POST /connect`, `POST /refresh`,
+`DELETE /connect`, `GET /checkouts`, `POST /invoices/<id>/checkout` (only
+the member the invoice is for), `POST /checkouts/confirm`.
 
 ## Develop
 
-Clone the repository into `plugins/<id>` of a Hubra checkout:
+Clone into `plugins/payments` of a Hubra checkout, then from `app/backend`:
 
 ```
-cd hubra/app/backend
-pytest ../../plugins/<id>                       # tests, with Hubra's fixtures
-flask plugins revision <id> -m "..." --autogenerate   # with HUBRA_PLUGINS_AUTOINSTALL=<id>
-cd ../frontend
-npm run typecheck:plugins
-npm run build:plugin -- ../../plugins/<id>      # --watch while you work
+pytest ../../plugins/payments          # Stripe is faked, no network
+cd ../frontend && npm run build:plugin -- ../../plugins/payments
 ```
 
-With `HUBRA_PLUGINS_AUTOINSTALL=<id>` a local Hubra loads the plugin from the
-checkout without installing it.
-
-## Release
-
-Bump `version` in `plugin.yaml`, add a `## <version>` section to
-`CHANGELOG.md`, merge, then publish a GitHub release tagged `v<version>`
-(`gh release create v1.0.0 --target main --notes ""`). The workflow tests the
-plugin and builds its frontend, the `plugin-signing` job signs it after your
-approval, and `<id>-<version>.zip` plus its `.sha256` are attached to the
-release. The template itself is never signed.
-
-Migrations must keep the previous version working (add columns and tables,
-drop them a release later): a rollback in the plugin catalogue does not undo
-them.
+Releasing: publish a GitHub release `v<version>` matching `plugin.yaml`; the
+workflow signs and attaches the zip.
