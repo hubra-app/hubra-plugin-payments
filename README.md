@@ -59,5 +59,9 @@ pytest ../../plugins/payments          # Stripe is faked, no network
 cd ../frontend && npm run build:plugin -- ../../plugins/payments
 ```
 
-Releasing: publish a GitHub release `v<version>` matching `plugin.yaml`; the
-workflow signs and attaches the zip.
+Releasing: bump `version` in `plugin.yaml`, merge, then tag the merged commit
+on main and push the tag (`git switch main && git pull`, then
+`git tag v<version> && git push origin v<version>`). The workflow tests and
+signs the plugin, and after the signing approval publishes the GitHub release
+`v<version>` with `payments-<version>.zip` attached. Releases are immutable:
+fix a bad one with a new version.
