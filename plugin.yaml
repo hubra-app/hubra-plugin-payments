@@ -1,20 +1,17 @@
-id: example
-name: Example
-version: "0.1.0"
+id: payments
+name: Online payments
+version: "1.0.0"
 hubra: ">=0.2,<1"
-description: "A starting point for a Hubra plugin: one table, an API, a screen and a test."
+description: "Members pay their invoices online by card or TWINT. The club connects its own Stripe account (Stripe Connect), the money goes straight to the club and the invoice is marked paid by itself."
 author: Hubra
-homepage: https://github.com/hubra-app/hubra-plugins-template
+homepage: https://github.com/hubra-app/hubra-plugin-payments
 license: AGPL-3.0-or-later
-tags: [example]
-package: hubra_example
-modules: [example]
-requires: [members]
+tags: [finance, payments, twint, stripe]
+package: hubra_payments
+modules: [payments]
+requires: [members, finance]
 migrations: migrations
 frontend: frontend/dist/plugin.js
 # The areas this plugin extends; Hubra refuses a plugin that touches one it
 # doesn't list. See docs/plugins.md in hubra-app/hubra.
-uses: [routes, tables, settings, nav, frontend]
-# Other plugins it needs, with a version range, e.g.
-# depends:
-#   finance: ">=2.0,<3"
+uses: [routes, tables, jobs, nav, frontend]

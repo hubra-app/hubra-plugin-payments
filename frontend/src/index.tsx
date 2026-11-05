@@ -1,22 +1,19 @@
 import { registerPlugin } from '@hubra/plugin-sdk'
-import { IconNote } from '@tabler/icons-react'
-import { NotesScreen } from './NotesScreen'
+import { IconCreditCard } from '@tabler/icons-react'
+import { PayButton } from './PayButton'
+import { PaymentsScreen } from './PaymentsScreen'
+import { ReturnScreen } from './ReturnScreen'
 import translations from './translations.json'
 
-// Everything here shows only while the module is on for the club and the
-// person has `perm`. Other places to add things: `tabs` (a tab on a built-in
-// screen) and `slots` (account.cards, inventory.item, settings.module.actions).
 registerPlugin({
-  id: 'example',
+  id: 'payments',
   routes: [
-    {
-      path: 'example',
-      module: 'example',
-      perm: 'example.notes.read',
-      component: NotesScreen,
-    },
+    { path: 'payments', module: 'payments', perm: 'payments.account.manage', component: PaymentsScreen },
+    // Every member comes back here from Stripe.
+    { path: 'payments/return', module: 'payments', component: ReturnScreen },
   ],
-  // The nav entry in hubra_example/__init__.py names this icon.
-  icons: { note: IconNote },
+  slots: [{ slot: 'invoice.actions', module: 'payments', component: PayButton }],
+  // The nav entry in hubra_payments/__init__.py names this icon.
+  icons: { 'credit-card': IconCreditCard },
   translations,
 })
