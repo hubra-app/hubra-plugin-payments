@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal, InvalidOperation
 
 from sqlalchemy import func, select
 
@@ -75,6 +75,86 @@ def cents(amount: Decimal | float | int | str) -> int:
     return int(
         (Decimal(str(amount)) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     )
+
+
+# ── Passing the fees on ──────────────────────────────────────────────────────
+
+# Limits for what a club enters as its Stripe rate.
+MAX_SURCHARGE_PERCENT = Decimal("10")
+MAX_SURCHARGE_FIXED = Decimal("5")
+
+
+def _fee(total: int, percent: Decimal) -> int:
+    return int(
+        (Decimal(total) * percent / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    )
+
+
+def price(amount: int, acc: PaymentAccount | None, hubra_percent) -> tuple[int, int]:
+    """What the member pays for an invoice of *amount* cents: ``(total,
+    surcharge)``.
+
+    Without passing the fees on, the total is the invoice amount. With it,
+    the total is grossed up so that after Stripe's fee (the club's rate:
+    percent of the total plus a fixed amount) and the Hubra fee (percent of
+    the total) the club keeps at least the invoice amount::
+
+        total = (amount + fixed) / (1 - stripe% - hubra%), rounded up
+    """
+    if acc is None or not acc.pass_fees:
+        return amount, 0
+    pct = Decimal(str(acc.surcharge_percent or 0)) + Decimal(str(hubra_percent or 0))
+    fixed = cents(acc.surcharge_fixed or 0)
+    if pct <= 0 and fixed <= 0:
+        return amount, 0
+    total = int(
+        (Decimal(amount + fixed) / (1 - pct / 100)).to_integral_value(
+            rounding=ROUND_CEILING
+        )
+    )
+    return total, total - amount
+
+
+def _rate(value, field: str, limit: Decimal) -> Decimal:
+    try:
+        d = Decimal(str(value if value not in (None, "") else 0))
+    except (InvalidOperation, ValueError):
+        raise PaymentError("VALIDATION_ERROR", f"{field} must be a number") from None
+    if not d.is_finite() or d < 0 or d > limit:
+        raise PaymentError("VALIDATION_ERROR", f"{field} must be between 0 and {limit}")
+    return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def save_fee_settings(body: dict, member) -> PaymentAccount:
+    """Whether members pay the fees, and the club's Stripe rate."""
+    acc = account()
+    if acc is None:
+        raise PaymentError("NO_ACCOUNT", "Connect a Stripe account first.", 409)
+    if "passFees" in body:
+        if not isinstance(body["passFees"], bool):
+            raise PaymentError("VALIDATION_ERROR", "passFees must be true or false")
+        acc.pass_fees = body["passFees"]
+    if "surchargePercent" in body:
+        acc.surcharge_percent = _rate(
+            body["surchargePercent"], "surchargePercent", MAX_SURCHARGE_PERCENT
+        )
+    if "surchargeFixed" in body:
+        acc.surcharge_fixed = _rate(
+            body["surchargeFixed"], "surchargeFixed", MAX_SURCHARGE_FIXED
+        )
+    log_audit(
+        getattr(member, "id", None),
+        "payments.fees",
+        "payments_account",
+        acc.id,
+        "Gebühren an Mitglieder: "
+        + (
+            f"ja ({acc.surcharge_percent} % + CHF {acc.surcharge_fixed})"
+            if acc.pass_fees
+            else "nein"
+        ),
+    )
+    return acc
 
 
 # ── Club URLs ────────────────────────────────────────────────────────────────
@@ -184,6 +264,7 @@ def _reusable(invoice: Invoice, amount: int) -> PaymentCheckout | None:
         .where(PaymentCheckout.status == "open")
         .order_by(PaymentCheckout.id.desc())
     )
+    # Same total: a changed invoice or fee setting gets a new checkout.
     if chk is None or cents(chk.amount) != amount or not chk.url:
         return None
     expires = _aware(chk.expires_at)
@@ -206,15 +287,13 @@ def start_checkout(invoice: Invoice, member) -> PaymentCheckout:
         raise PaymentError(
             "AMOUNT_TOO_SMALL", "Online payments start at CHF 0.50.", 400
         )
-    reuse = _reusable(invoice, amount)
+    total, surcharge = price(amount, acc, p.fee_percent)
+    reuse = _reusable(invoice, total)
     if reuse is not None:
         return reuse
 
-    fee = int(
-        (Decimal(amount) * Decimal(str(p.fee_percent)) / 100).quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP
-        )
-    )
+    # The Hubra fee is a share of what the member pays.
+    fee = _fee(total, Decimal(str(p.fee_percent)))
     tries = db.session.scalar(
         select(func.count(PaymentCheckout.id)).where(
             PaymentCheckout.invoice_id == invoice.id
@@ -242,7 +321,21 @@ def start_checkout(invoice: Invoice, member) -> PaymentCheckout:
                     "product_data": {"name": label},
                 },
             }
-        ],
+        ]
+        + (
+            [
+                {
+                    "quantity": 1,
+                    "price_data": {
+                        "currency": CURRENCY,
+                        "unit_amount": surcharge,
+                        "product_data": {"name": "Gebühr für die Online-Zahlung"},
+                    },
+                }
+            ]
+            if surcharge
+            else []
+        ),
         # No payment_method_types: Stripe offers what the club turned on in
         # its dashboard (card, TWINT, ...) for CHF.
         "success_url": club_url(
@@ -258,7 +351,7 @@ def start_checkout(invoice: Invoice, member) -> PaymentCheckout:
             "application_fee_amount": fee or None,
         },
     }
-    idem = f"hubra-{meta['hubra_club']}-inv{invoice.id}-{amount}-{tries}"
+    idem = f"hubra-{meta['hubra_club']}-inv{invoice.id}-{total}-{tries}"
     session = stripe_api.create_checkout(
         p.secret_key, acc.stripe_account_id, data, idempotency_key=idem
     )
@@ -269,8 +362,9 @@ def start_checkout(invoice: Invoice, member) -> PaymentCheckout:
         stripe_account_id=acc.stripe_account_id,
         session_id=session["id"],
         url=session.get("url"),
-        amount=Decimal(amount) / 100,
+        amount=Decimal(total) / 100,
         fee=Decimal(fee) / 100,
+        surcharge=Decimal(surcharge) / 100,
         currency=CURRENCY,
         status="open",
         expires_at=(

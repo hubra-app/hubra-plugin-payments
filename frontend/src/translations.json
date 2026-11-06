@@ -28,7 +28,7 @@
       },
       "twintHint": "TWINT is not active yet: turn it on in the club's Stripe dashboard under Settings › Payment methods.",
       "checkedAt": "checked {{at}}",
-      "fee": "Platform fee: {{percent}} % of each payment, on top of Stripe's fees.",
+      "fee": "Hubra fee: {{percent}} % of each payment, on top of Stripe's fees.",
       "check": "Check",
       "checked": "Account checked",
       "connect": "Connect Stripe",
@@ -66,7 +66,23 @@
         "cancelledTitle": "Payment cancelled",
         "cancelledBody": "Nothing was paid. You can pay the invoice later.",
         "back": "Back to my overview"
-      }
+      },
+      "plusFee": "plus a fee for paying online",
+      "fees": {
+        "title": "Who pays the fees",
+        "club": "The club pays the fees",
+        "clubHint": "Members pay the invoice amount. Stripe's fees and the Hubra fee come off what the club receives.",
+        "members": "Members pay the fees",
+        "membersHint": "Members pay a surcharge on top, sized so the club still receives the full invoice amount. Enter the rate Stripe charges the club.",
+        "percent": "Stripe fee (%)",
+        "fixed": "Stripe fixed fee (CHF)",
+        "rateHint": "See the club's Stripe dashboard under Settings › Pricing. Card and TWINT can differ: enter the higher rate so the club never comes up short.",
+        "example": "Example: an invoice of CHF {{amount}} costs the member CHF {{total}}.",
+        "save": "Save",
+        "saved": "Fee settings saved",
+        "legal": "Check that a surcharge is allowed for the payment methods the club offers."
+      },
+      "inclFee": "incl. fee CHF {{fee}}"
     }
   },
   "de-CH": {
@@ -98,7 +114,7 @@
       },
       "twintHint": "TWINT ist noch nicht aktiv: im Stripe-Dashboard des Vereins unter Einstellungen › Zahlungsmethoden einschalten.",
       "checkedAt": "geprüft {{at}}",
-      "fee": "Plattformgebühr: {{percent}} % jeder Zahlung, zusätzlich zu den Stripe-Gebühren.",
+      "fee": "Hubra-Gebühr: {{percent}} % jeder Zahlung, zusätzlich zu den Stripe-Gebühren.",
       "check": "Prüfen",
       "checked": "Konto geprüft",
       "connect": "Stripe verbinden",
@@ -136,7 +152,23 @@
         "cancelledTitle": "Zahlung abgebrochen",
         "cancelledBody": "Es wurde nichts bezahlt. Du kannst die Rechnung später bezahlen.",
         "back": "Zurück zu meiner Übersicht"
-      }
+      },
+      "plusFee": "zuzüglich Gebühr für die Online-Zahlung",
+      "fees": {
+        "title": "Wer zahlt die Gebühren",
+        "club": "Der Verein zahlt die Gebühren",
+        "clubHint": "Mitglieder zahlen den Rechnungsbetrag. Die Stripe-Gebühren und die Hubra-Gebühr gehen vom Betrag ab, den der Verein erhält.",
+        "members": "Die Mitglieder zahlen die Gebühren",
+        "membersHint": "Mitglieder zahlen einen Zuschlag, so bemessen, dass der Verein den vollen Rechnungsbetrag erhält. Gib den Satz ein, den Stripe dem Verein verrechnet.",
+        "percent": "Stripe-Gebühr (%)",
+        "fixed": "Stripe-Gebühr fix (CHF)",
+        "rateHint": "Steht im Stripe-Dashboard des Vereins unter Einstellungen › Preise. Karte und TWINT können sich unterscheiden: Gib den höheren Satz ein, damit dem Verein nichts fehlt.",
+        "example": "Beispiel: Eine Rechnung über CHF {{amount}} kostet das Mitglied CHF {{total}}.",
+        "save": "Speichern",
+        "saved": "Gebühren-Einstellungen gespeichert",
+        "legal": "Prüfe, ob ein Zuschlag für die angebotenen Zahlungsarten erlaubt ist."
+      },
+      "inclFee": "inkl. Gebühr CHF {{fee}}"
     }
   }
 }

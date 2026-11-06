@@ -3,8 +3,8 @@
 The club connects its own Stripe account to the platform's (Stripe Connect,
 a Standard account). A member who pays an open invoice is sent to a Stripe
 Checkout page of the club's account; the money goes to the club, Stripe
-takes its fees from it and the platform, if manage › Payments sets a fee,
-its share. When Stripe reports the payment as paid, the invoice is marked
+takes its fees from it and Hubra, if manage › Payments sets a Hubra fee,
+its share. The club can pass both on to members as a surcharge. When Stripe reports the payment as paid, the invoice is marked
 paid like a bank payment would (its income transaction is completed).
 
 Stripe can't send Connect webhooks to one club, so Hubra asks: when the
