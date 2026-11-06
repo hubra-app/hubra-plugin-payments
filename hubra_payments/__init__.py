@@ -44,4 +44,8 @@ module = Module(
     schedule=(
         Schedule("payments-sync-10min", "hubra_payments.tasks.sync_open", 600.0),
     ),
+    # Hubra's features it uses, through contracts (docs/contracts.md in hubra).
+    consumes={
+        "finance.invoice.set_status": ">=1,<2",
+    },
 )

@@ -318,9 +318,16 @@ def apply_session(chk: PaymentCheckout, session: dict) -> str:
         chk.method = _method(session)
         invoice = db.session.get(Invoice, chk.invoice_id) if chk.invoice_id else None
         if invoice is not None and invoice.status != "Paid":
-            from hubra.api.finance.services import InvoiceService
+            from hubra.core.contracts import SYSTEM, call
 
-            InvoiceService.update(invoice, {"status": "Paid"}, chk.member_id)
+            # Stripe says it's paid; the member paying holds no invoice right.
+            call(
+                "finance.invoice.set_status",
+                invoice_id=invoice.id,
+                status="Paid",
+                actor_id=chk.member_id,
+                actor=SYSTEM,
+            )
         log_audit(
             chk.member_id,
             "payments.paid",
