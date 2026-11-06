@@ -101,6 +101,15 @@ def stripe(monkeypatch):
     return fake
 
 
+def _test_key_slot() -> str:
+    """Where a sk_test_ key goes: the sandbox slot since Hubra has one."""
+    from hubra.core.services import platform_settings
+
+    keys = {s.key for s in platform_settings.SPECS}
+    sandbox = "payments.stripe.sandbox_secret_key"
+    return sandbox if sandbox in keys else "payments.stripe.secret_key"
+
+
 @pytest.fixture
 def club(client, app, db, seeded_db, stripe):
     """Payments on with a platform key; Tina (manage) and Mia (no rights)
@@ -112,7 +121,7 @@ def club(client, app, db, seeded_db, stripe):
     app.test_cli_runner().invoke(args=["sync-permissions"])
     platform_settings.set_many(
         {
-            "payments.stripe.secret_key": "sk_test_abcdefghijklmnop",
+            _test_key_slot(): "sk_test_abcdefghijklmnop",
             "payments.fee_percent": "1.5",
         }
     )
@@ -287,6 +296,39 @@ def test_the_job_books_payments_and_ends_old_checkouts(client, club, stripe, db)
     assert db.session.get(PaymentCheckout, stale.id).status == "expired"
 
 
+def test_an_account_belongs_to_one_stripe_mode(
+    client, club, stripe, db, monkeypatch
+):
+    """Connected with the sandbox key, the account isn't used once the
+    platform runs live, and its checkouts wait for the sandbox again."""
+    from hubra.core.services import platform_settings
+    from hubra_payments import services
+
+    _connect(client, stripe)
+    _login(client, "mia@test.ch")
+    client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    sandbox = services.account()
+    assert sandbox is not None and sandbox.livemode is False
+
+    live = platform_settings.StripePlatform(
+        secret_key="sk_live_abcdefghijklmnop", fee_percent=0.0
+    )
+    monkeypatch.setattr(services, "platform", lambda: live)
+    assert services.account() is None
+    assert services.ready() is False
+    assert services.sync_open() == {"checked": 0}
+    calls = len(stripe.calls)
+    _login(client, "tina@test.ch")
+    client.post(f"{BASE}/connect")
+    assert stripe.calls[calls]["headers"]["Authorization"].startswith(
+        "Bearer sk_live_"
+    )
+    assert services.account().livemode is True
+
+    monkeypatch.undo()
+    assert services.account().id == sandbox.id
+
+
 def test_a_changed_amount_gets_a_new_checkout(client, club, stripe, db):
     from hubra.core.models.finance import Invoice
 
@@ -361,7 +403,7 @@ def test_disconnect_ends_open_checkouts(client, club, stripe):
 def test_no_platform_key(client, club, db):
     from hubra.core.services import platform_settings
 
-    platform_settings.set_many({"payments.stripe.secret_key": None})
+    platform_settings.set_many({_test_key_slot(): None})
     db.session.commit()
     _login(client, "tina@test.ch")
     st = client.get(f"{BASE}/status").get_json()

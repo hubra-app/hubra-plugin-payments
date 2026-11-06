@@ -1,6 +1,6 @@
 id: payments
 name: Online payments
-version: "1.1.0"
+version: "1.2.0"
 hubra: ">=0.2.2,<1"
 description: "Members pay their invoices online by card or TWINT. The club connects its own Stripe account (Stripe Connect), the money goes straight to the club and the invoice is marked paid by itself."
 author: Hubra
