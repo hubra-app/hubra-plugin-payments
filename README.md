@@ -45,6 +45,8 @@ the pay button says a fee comes on top, and the club's list of payments shows
 it. Card and TWINT can cost different amounts; the club enters the higher rate.
 Check that a surcharge is allowed for the payment methods the club offers.
 
+![Who pays the fees](docs/screenshots/pay-fees.png)
+
 ## How a payment is booked
 
 Stripe can't send Connect webhooks to one club, so Hubra asks Stripe:

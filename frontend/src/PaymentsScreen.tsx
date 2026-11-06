@@ -326,6 +326,11 @@ export function PaymentsScreen() {
                       </Table.Td>
                       <Table.Td data-label={t('payments.col.amount')} style={{ textAlign: 'right' }} className="num">
                         CHF {formatCHF(c.amount)}
+                        {c.surcharge > 0 && (
+                          <Text size="xs" c="dimmed">
+                            {t('payments.inclFee', { fee: formatCHF(c.surcharge) })}
+                          </Text>
+                        )}
                       </Table.Td>
                     </Table.Tr>
                   ))}
