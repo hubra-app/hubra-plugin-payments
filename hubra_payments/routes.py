@@ -3,6 +3,7 @@
 GET    /status                      for everyone: may members pay online here?
 POST   /connect                     admin: the Stripe page to set up the account
 POST   /refresh                     admin: read the account's state from Stripe
+PUT    /fees                        admin: pass the fees on to members, and the rate
 DELETE /connect                     admin: forget the account
 GET    /checkouts                   admin: the club's online payments
 POST   /invoices/<id>/checkout      member: pay one's own open invoice
@@ -55,6 +56,9 @@ def _account_dict() -> dict | None:
         "card": bool(acc.card),
         "twint": bool(acc.twint),
         "checkedAt": acc.checked_at.isoformat() if acc.checked_at else None,
+        "passFees": bool(acc.pass_fees),
+        "surchargePercent": float(acc.surcharge_percent or 0),
+        "surchargeFixed": float(acc.surcharge_fixed or 0),
     }
 
 
@@ -66,6 +70,7 @@ def _checkout_dict(chk: PaymentCheckout, names: dict[int, str]) -> dict:
         "memberName": names.get(chk.member_id or 0),
         "amount": float(chk.amount),
         "fee": float(chk.fee or 0),
+        "surcharge": float(chk.surcharge or 0),
         "status": chk.status,
         "method": chk.method,
         "createdAt": chk.created_at.isoformat() if chk.created_at else None,
@@ -79,12 +84,15 @@ def status():
     member = get_current_member()
     manager = member_has_permission(member, MANAGE)
     platform = services.platform()
+    acc = services.account()
     out = {
         "platform": platform is not None,
         "testMode": bool(platform and platform.test_mode),
         "ready": services.ready(),
         "memberId": member.id if member else None,
         "canManage": manager,
+        # Members see that a fee comes on top before they click.
+        "passFees": bool(services.ready() and acc and acc.pass_fees),
     }
     if manager:
         out["account"] = _account_dict()
@@ -120,6 +128,19 @@ def refresh():
         return _stripe_failed(exc)
     db.session.commit()
     return jsonify({"account": _account_dict(), "ready": services.ready()}), 200
+
+
+@payments_bp.put("/fees")
+@permission_required("account", "manage", "Connect Stripe and see online payments")
+def fees():
+    try:
+        services.save_fee_settings(
+            request.get_json(silent=True) or {}, get_current_member()
+        )
+    except services.PaymentError as exc:
+        return _payment_failed(exc)
+    db.session.commit()
+    return jsonify({"account": _account_dict()}), 200
 
 
 @payments_bp.delete("/connect")

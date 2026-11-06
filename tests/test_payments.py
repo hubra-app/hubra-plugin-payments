@@ -73,7 +73,11 @@ class FakeStripe:
                 "url": f"https://checkout.stripe.com/c/pay/{sid}",
                 "status": "open",
                 "payment_status": "unpaid",
-                "amount_total": int(form["line_items[0][price_data][unit_amount]"]),
+                "amount_total": sum(
+                    int(v)
+                    for k, v in form.items()
+                    if k.endswith("[price_data][unit_amount]")
+                ),
                 "currency": form["line_items[0][price_data][currency]"],
                 "expires_at": int(time.time()) + 86400,
             }
@@ -295,6 +299,52 @@ def test_a_changed_amount_gets_a_new_checkout(client, club, stripe, db):
     client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
     assert len(stripe.sessions) == 2
     assert stripe.calls[-1]["form"]["line_items[0][price_data][unit_amount]"] == "8000"
+
+
+def test_members_can_pay_the_fees(client, club, stripe, db):
+    """With the fees passed on, the club still gets the full invoice amount."""
+    from hubra.core.models.finance import Invoice
+
+    _connect(client, stripe)
+    r = client.put(
+        f"{BASE}/fees",
+        json={"passFees": True, "surchargePercent": 2.9, "surchargeFixed": "0.30"},
+    )
+    assert r.status_code == 200, r.get_json()
+    acc = r.get_json()["account"]
+    assert acc["passFees"] and acc["surchargePercent"] == 2.9
+    assert acc["surchargeFixed"] == 0.3
+    bad = client.put(f"{BASE}/fees", json={"surchargePercent": 50})
+    assert bad.status_code == 400
+
+    _login(client, "mia@test.ch")
+    assert client.get(f"{BASE}/status").get_json()["passFees"] is True
+    client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    form = stripe.calls[-1]["form"]
+    # (12000 + 30) / (1 - 0.029 - 0.015) = 12583.68 -> 12584
+    assert form["line_items[0][price_data][unit_amount]"] == "12000"
+    assert form["line_items[1][price_data][unit_amount]"] == "584"
+    fee = int(form["payment_intent_data[application_fee_amount]"])
+    assert fee == 189  # 1.5 % of 125.84
+    # What the club keeps: total - Stripe (2.9 % + 0.30) - Hubra fee.
+    assert 12584 - round(12584 * 0.029) - 30 - fee >= 12000
+
+    stripe.pay("cs_test_1", method="card")
+    ok = client.post(f"{BASE}/checkouts/confirm", json={"sessionId": "cs_test_1"})
+    assert ok.get_json()["status"] == "paid"
+    db.session.expire_all()
+    assert db.session.get(Invoice, club["invoice"]).status == "Paid"
+    _login(client, "tina@test.ch")
+    row = client.get(f"{BASE}/checkouts").get_json()[0]
+    assert row["amount"] == 125.84 and row["surcharge"] == 5.84
+
+
+def test_fee_settings_need_the_right_and_an_account(client, club, stripe):
+    _login(client, "tina@test.ch")
+    r = client.put(f"{BASE}/fees", json={"passFees": True})
+    assert r.status_code == 409
+    _login(client, "mia@test.ch")
+    assert client.put(f"{BASE}/fees", json={"passFees": True}).status_code == 403
 
 
 def test_disconnect_ends_open_checkouts(client, club, stripe):

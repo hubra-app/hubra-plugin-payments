@@ -29,6 +29,16 @@ class PaymentAccount(db.Model):
     card: Mapped[bool] = mapped_column(Boolean, default=False)
     twint: Mapped[bool] = mapped_column(Boolean, default=False)
     display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # The club passes the fees on: members pay the invoice plus a surcharge
+    # sized so the club still gets the full invoice amount after Stripe's
+    # fee (the club's rate, percent plus fixed) and the Hubra fee.
+    pass_fees: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    surcharge_percent: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), default=Decimal("0"), nullable=False
+    )
+    surcharge_fixed: Mapped[Decimal] = mapped_column(
+        Numeric(8, 2), default=Decimal("0"), nullable=False
+    )
     connected_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("members.id", ondelete="SET NULL"), nullable=True
     )
@@ -60,6 +70,10 @@ class PaymentCheckout(db.Model):
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     fee: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    # Part of amount the member paid on top of the invoice (0: none).
+    surcharge: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=0
+    )
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="chf")
     # open → paid | expired
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="open")

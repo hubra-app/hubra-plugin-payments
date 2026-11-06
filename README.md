@@ -14,7 +14,8 @@ income transaction like a bank payment would.
 
 1. **Platform** (once, manage › Payments): the platform's Stripe secret key
    (`sk_test_…` for test mode, `sk_live_…` for real money), and optionally a
-   platform fee in percent. Connect must be turned on in the platform's
+   Hubra fee in percent (Hubra's share of each payment; manage › All clubs ›
+   club › Billing can set a club's own). Connect must be turned on in the platform's
    Stripe dashboard.
 2. **Club** (Weitere › Online-Zahlungen, permission
    `payments.account.manage`): **Stripe verbinden** creates the club's
@@ -28,6 +29,22 @@ income transaction like a bank payment would.
 
 ![The club's Stripe account and its payments](docs/screenshots/pay-admin.png)
 
+## Who pays the fees
+
+By default the member pays the invoice amount, and Stripe's fee and the
+Hubra fee come off what the club receives. Under **Wer zahlt die Gebühren**
+the club can pass them on instead: it enters the rate Stripe charges it
+(percent plus a fixed amount per payment, from its Stripe dashboard), and
+members pay a surcharge on top, sized so the club still receives the full
+invoice amount:
+
+    total = (invoice + fixed) / (1 − Stripe % − Hubra %), rounded up to the cent
+
+Checkout shows the surcharge as its own line ("Gebühr für die Online-Zahlung"),
+the pay button says a fee comes on top, and the club's list of payments shows
+it. Card and TWINT can cost different amounts; the club enters the higher rate.
+Check that a surcharge is allowed for the payment methods the club offers.
+
 ## How a payment is booked
 
 Stripe can't send Connect webhooks to one club, so Hubra asks Stripe:
@@ -35,8 +52,8 @@ Stripe can't send Connect webhooks to one club, so Hubra asks Stripe:
 - when the member comes back from Checkout (`/app/payments/return`), and
 - every ten minutes for checkouts still open (`hubra_payments.tasks.sync_open`).
 
-A paid checkout marks the invoice paid only when the amount and currency
-match. An open checkout is used again while it has more than ten minutes
+A paid checkout marks the invoice paid only when the amount (invoice plus
+any surcharge) and currency match. An open checkout is used again while it has more than ten minutes
 left; if the invoice amount changed, the member gets a new one. Checkouts end
 after 24 hours (Stripe's limit). Disconnecting Stripe ends open checkouts;
 the Stripe account and its money stay the club's.

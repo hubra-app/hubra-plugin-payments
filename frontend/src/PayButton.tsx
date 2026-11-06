@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Button } from '@mantine/core'
+import { Button, Stack, Text } from '@mantine/core'
 import { IconCreditCard } from '@tabler/icons-react'
 import { useT, useToast, type SlotProps } from '@hubra/plugin-sdk'
 import { QK, errorText, getStatus, startCheckout } from './api'
@@ -25,9 +25,18 @@ export function PayButton({ invoice }: SlotProps['invoice.actions']) {
       setBusy(false)
     }
   }
-  return (
+  const button = (
     <Button size="sm" variant="filled" loading={busy} onClick={pay} leftSection={<IconCreditCard size={16} />}>
       {t('payments.pay')}
     </Button>
+  )
+  if (!s.passFees) return button
+  return (
+    <Stack gap={2} align="flex-start">
+      {button}
+      <Text size="xs" c="dimmed">
+        {t('payments.plusFee')}
+      </Text>
+    </Stack>
   )
 }

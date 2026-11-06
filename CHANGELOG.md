@@ -2,6 +2,11 @@
 
 ## 1.1.0
 
+Added: clubs can pass the fees on to members (Wer zahlt die Gebühren):
+members pay a surcharge on top of the invoice, sized from the club's Stripe
+rate and the Hubra fee so the club still receives the full invoice amount.
+The "platform fee" is now called the Hubra fee.
+
 Fixed: the plugin didn't load in Hubra 0.2.2 and later (the club backend
 image no longer ships `hubra.api`), so Online payments never showed up in a
 club's modules. Paid invoices are now marked through the

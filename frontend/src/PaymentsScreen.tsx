@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Badge, Button, Group, Paper, Stack, Table, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Group, NumberInput, Paper, Radio, Stack, Table, Text, Title } from '@mantine/core'
 import { IconAlertTriangle, IconBrandStripe, IconRefresh } from '@tabler/icons-react'
 import {
   ConfirmModal,
@@ -14,13 +14,107 @@ import {
   useT,
   useToast,
 } from '@hubra/plugin-sdk'
-import { QK, connect, disconnect, errorText, getStatus, listCheckouts, refresh, type Account } from './api'
+import {
+  QK,
+  connect,
+  disconnect,
+  errorText,
+  getStatus,
+  listCheckouts,
+  priceFor,
+  refresh,
+  saveFees,
+  type Account,
+} from './api'
 
 function Flag({ on, label }: { on: boolean; label: string }) {
   return (
     <Badge variant="light" color={on ? 'green' : 'gray'}>
       {label}
     </Badge>
+  )
+}
+
+type FeeEdits = Partial<Pick<Account, 'passFees' | 'surchargePercent' | 'surchargeFixed'>>
+
+/** Who pays the fees: the club, or the members through a surcharge. */
+function FeesCard({ acc, hubraPercent }: { acc: Account; hubraPercent: number }) {
+  const { t } = useT()
+  const { notify } = useToast()
+  const qc = useQueryClient()
+  const [edits, setEdits] = useState<FeeEdits>({})
+  const [saving, setSaving] = useState(false)
+  const view: Account = { ...acc, ...edits }
+  const dirty = Object.keys(edits).length > 0
+  const save = async () => {
+    setSaving(true)
+    try {
+      await saveFees(edits)
+      await qc.invalidateQueries({ queryKey: QK.status })
+      setEdits({})
+      notify('success', t('payments.fees.saved'))
+    } catch (err) {
+      notify('error', errorText(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+  const total = priceFor(100, view, hubraPercent)
+  return (
+    <Paper withBorder p="lg">
+      <Stack gap="sm">
+        <Title order={4}>{t('payments.fees.title')}</Title>
+        <Radio.Group
+          value={view.passFees ? 'members' : 'club'}
+          onChange={(v) => setEdits((e) => ({ ...e, passFees: v === 'members' }))}
+        >
+          <Stack gap="xs">
+            <Radio value="club" label={t('payments.fees.club')} description={t('payments.fees.clubHint')} />
+            <Radio value="members" label={t('payments.fees.members')} description={t('payments.fees.membersHint')} />
+          </Stack>
+        </Radio.Group>
+        {view.passFees && (
+          <>
+            <Group gap="sm" align="flex-start" wrap="wrap">
+              <NumberInput
+                label={t('payments.fees.percent')}
+                value={view.surchargePercent}
+                onChange={(v) => setEdits((e) => ({ ...e, surchargePercent: Number(v) || 0 }))}
+                min={0}
+                max={10}
+                step={0.1}
+                decimalScale={2}
+                w={200}
+              />
+              <NumberInput
+                label={t('payments.fees.fixed')}
+                value={view.surchargeFixed}
+                onChange={(v) => setEdits((e) => ({ ...e, surchargeFixed: Number(v) || 0 }))}
+                min={0}
+                max={5}
+                step={0.05}
+                decimalScale={2}
+                w={200}
+              />
+            </Group>
+            <Text size="xs" c="dimmed">
+              {t('payments.fees.rateHint')}
+            </Text>
+            <Text size="sm">
+              {t('payments.fees.example', { amount: formatCHF(100), total: formatCHF(total) })}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {t('payments.fees.legal')}
+            </Text>
+          </>
+        )}
+        <Group>
+          <Button onClick={save} loading={saving} disabled={!dirty}>
+            {t('payments.fees.save')}
+          </Button>
+        </Group>
+      </Stack>
+    </Paper>
   )
 }
 
@@ -170,6 +264,8 @@ export function PaymentsScreen() {
             </Group>
           </Group>
         </Paper>
+
+        {acc && <FeesCard acc={acc} hubraPercent={s.feePercent ?? 0} />}
 
         <Paper withBorder>
           <Group p="md" style={{ borderBottom: '1px solid var(--hb-border)' }}>
