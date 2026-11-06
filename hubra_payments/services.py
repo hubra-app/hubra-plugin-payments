@@ -63,7 +63,14 @@ def _key() -> str:
 
 
 def account() -> PaymentAccount | None:
-    return db.session.scalar(select(PaymentAccount).order_by(PaymentAccount.id))
+    """The club's account in the platform's current Stripe mode: one made
+    with the sandbox key is not used live, nor the other way round (Hubra
+    has a sandbox and a live key; sandbox clubs always use the sandbox)."""
+    query = select(PaymentAccount).order_by(PaymentAccount.id)
+    p = platform()
+    if p is not None:
+        query = query.where(PaymentAccount.livemode.is_(not p.test_mode))
+    return db.session.scalar(query)
 
 
 def ready() -> bool:
@@ -197,7 +204,8 @@ def connect(member, club_name: str | None) -> str:
         data = stripe_api.create_account(key, getattr(member, "email", None), club_name)
         acc = PaymentAccount(
             stripe_account_id=data["id"],
-            livemode=bool(data.get("livemode")),
+            # From the key: Stripe's account object has no livemode.
+            livemode=not key.startswith(("sk_test_", "rk_test_")),
             connected_by=member.id if member else None,
         )
         _apply_account(acc, data)
@@ -452,12 +460,17 @@ def sync(chk: PaymentCheckout) -> str:
 
 def sync_open() -> dict:
     """Ask Stripe about every open checkout (the scheduler, every 10 min)."""
-    if platform() is None:
+    acc = account()
+    if platform() is None or acc is None:
         return {"checked": 0}
     done = {"checked": 0, "paid": 0, "expired": 0, "failed": 0}
+    # Only checkouts of the account in this mode: the key of the other mode
+    # can't read them (they wait until the mode is back).
     open_ids = list(
         db.session.scalars(
-            select(PaymentCheckout.id).where(PaymentCheckout.status == "open")
+            select(PaymentCheckout.id)
+            .where(PaymentCheckout.status == "open")
+            .where(PaymentCheckout.stripe_account_id == acc.stripe_account_id)
         )
     )
     for chk_id in open_ids:
