@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, Group, NumberInput, Paper, Radio, Stack, Table, Text, Title } from '@mantine/core'
-import { IconAlertTriangle, IconBrandStripe, IconList, IconRefresh, IconSettings } from '@tabler/icons-react'
+import { IconAlertTriangle, IconBrandStripe, IconRefresh } from '@tabler/icons-react'
 import {
   ConfirmModal,
   EmptyState,
   ErrorBanner,
   LoadingSpinner,
-  PageHead,
-  Tabs,
   formatCHF,
   formatDateTime,
   useT,
@@ -119,16 +117,20 @@ function FeesCard({ acc, hubraPercent }: { acc: Account; hubraPercent: number })
   )
 }
 
+/** Where the two parts live in Finanzen. */
+export const LIST_PATH = '/app/finance/online-payments'
+export const SETTINGS_PATH = '/app/finance/online-payments-settings'
+
 /**
- * Online payments: the list of payments, and the page's last tab
- * Einstellungen with the club's Stripe account and who pays the fees.
+ * Online payments, as two sub-tabs of Finanzen: the list of payments under
+ * Buchungen, and the club's Stripe account and who pays the fees under
+ * Einstellungen (Finanzen's last tab).
  */
-export function PaymentsScreen() {
+export function PaymentsScreen({ part }: { part: 'list' | 'settings' }) {
   const { t } = useT()
   const { notify } = useToast()
   const navigate = useNavigate()
-  const location = useLocation()
-  const settings = location.pathname.endsWith('/payments/settings')
+  const settings = part === 'settings'
   const qc = useQueryClient()
   const [params] = useSearchParams()
   const status = useQuery({ queryKey: QK.status, queryFn: getStatus })
@@ -159,7 +161,7 @@ export function PaymentsScreen() {
   const back = params.get('connected') || params.get('refresh')
   useEffect(() => {
     if (!back) return
-    doRefresh(true).then(() => navigate('/app/payments/settings', { replace: true }))
+    doRefresh(true).then(() => navigate(SETTINGS_PATH, { replace: true }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [back])
 
@@ -194,16 +196,12 @@ export function PaymentsScreen() {
 
   return (
     <>
-      <PageHead title={t('payments.title')} desc={t('payments.desc')} />
-      <Tabs
-        tabs={[
-          { id: 'list', label: t('payments.listTitle'), icon: <IconList size={16} /> },
-          { id: 'settings', label: t('payments.tabs.settings'), icon: <IconSettings size={16} /> },
-        ]}
-        activeTab={settings ? 'settings' : 'list'}
-        onTabChange={(id) => navigate(id === 'settings' ? '/app/payments/settings' : '/app/payments')}
-      />
       <Stack gap="md">
+        {settings && (
+          <Text size="sm" c="dimmed">
+            {t('payments.desc')}
+          </Text>
+        )}
         {!s.platform && (
           <Alert color="yellow" icon={<IconAlertTriangle size={18} />}>
             {t('payments.noPlatform')}
@@ -289,7 +287,7 @@ export function PaymentsScreen() {
               <Alert color="blue" variant="light">
                 <Group justify="space-between" gap="sm">
                   <Text size="sm">{t('payments.setupFirst')}</Text>
-                  <Button size="xs" variant="default" onClick={() => navigate('/app/payments/settings')}>
+                  <Button size="xs" variant="default" onClick={() => navigate(SETTINGS_PATH)}>
                     {t('payments.tabs.settings')}
                   </Button>
                 </Group>

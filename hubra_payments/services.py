@@ -221,8 +221,8 @@ def connect(member, club_name: str | None) -> str:
     return stripe_api.account_link(
         key,
         acc.stripe_account_id,
-        refresh_url=club_url("/app/payments/settings?refresh=1"),
-        return_url=club_url("/app/payments/settings?connected=1"),
+        refresh_url=club_url("/app/finance/online-payments-settings?refresh=1"),
+        return_url=club_url("/app/finance/online-payments-settings?connected=1"),
     )
 
 

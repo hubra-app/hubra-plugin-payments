@@ -1,5 +1,14 @@
 # Online payments
 
+## Unreleased
+
+- Online payments moved into Finanzen: the list of payments is
+  Finanzen › Buchungen › Online-Zahlungen (`/app/finance/online-payments`),
+  the Stripe account and fees are Finanzen › Einstellungen › Online-Zahlungen
+  (`/app/finance/online-payments-settings`), Finanzen's last tab. The page
+  under Weitere is gone; `/app/payments` and `/app/payments/settings` (and
+  Stripe's return links to them) open the new places.
+
 ## 1.3.0
 
 The page has two tabs: Zahlungen, the list of online payments, and
