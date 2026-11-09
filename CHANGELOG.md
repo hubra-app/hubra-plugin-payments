@@ -1,5 +1,12 @@
 # Online payments
 
+## 1.3.0
+
+The page has two tabs: Zahlungen, the list of online payments, and
+Einstellungen (`/app/payments/settings`), with the club's Stripe account and
+who pays the fees. Coming back from Stripe's set-up opens Einstellungen. This
+follows Hubra's rule that a setting lives on the page it configures, in its
+last tab.
 ## 1.2.2
 
 1.2.1 was tagged but couldn't be signed, so it was never released. 1.2.2 is the same plugin, signed. What it brings:

@@ -82,7 +82,11 @@
         "saved": "Fee settings saved",
         "legal": "Check that a surcharge is allowed for the payment methods the club offers."
       },
-      "inclFee": "incl. fee CHF {{fee}}"
+      "inclFee": "incl. fee CHF {{fee}}",
+      "tabs": {
+        "settings": "Settings"
+      },
+      "setupFirst": "Connect the club's Stripe account under Settings before members can pay online."
     }
   },
   "de-CH": {
@@ -168,7 +172,11 @@
         "saved": "Gebühren-Einstellungen gespeichert",
         "legal": "Prüfe, ob ein Zuschlag für die angebotenen Zahlungsarten erlaubt ist."
       },
-      "inclFee": "inkl. Gebühr CHF {{fee}}"
+      "inclFee": "inkl. Gebühr CHF {{fee}}",
+      "tabs": {
+        "settings": "Einstellungen"
+      },
+      "setupFirst": "Verbinde unter Einstellungen das Stripe-Konto des Vereins, damit Mitglieder online bezahlen können."
     }
   }
 }
