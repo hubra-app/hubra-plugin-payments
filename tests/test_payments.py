@@ -174,7 +174,7 @@ def test_connect_then_refresh(client, club, stripe):
     assert created["headers"]["Authorization"] == "Bearer sk_test_abcdefghijklmnop"
     link = stripe.calls[1]["form"]
     assert link["account"] == "acct_club"
-    assert link["return_url"].endswith("/app/payments?connected=1")
+    assert link["return_url"].endswith("/app/finance/online-payments?connected=1")
 
     st = client.get(f"{BASE}/status").get_json()
     assert st["account"]["chargesEnabled"] is False and st["ready"] is False

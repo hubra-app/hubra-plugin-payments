@@ -14,7 +14,7 @@ Permissions:
     payments.account.manage   connect Stripe and see the club's online payments
 """
 
-from hubra.core.modules import Blueprint, Module, NavItem, Schedule
+from hubra.core.modules import Blueprint, Module, Schedule
 
 module = Module(
     code="payments",
@@ -29,16 +29,8 @@ module = Module(
             "/api/v1/app/payments",
         ),
     ),
-    nav=(
-        NavItem(
-            "/app/payments",
-            "shell.nav.payments",
-            "credit-card",
-            section="more",
-            order=60,
-            perms=("payments.account.manage",),
-        ),
-    ),
+    # No nav entry: the Stripe set-up is a tab of Finanzen › Einstellungen
+    # (frontend/src/index.tsx), next to Bank & QR-Rechnung.
     tables=("payments_account", "payments_checkouts"),
     tasks=("hubra_payments.tasks",),
     schedule=(

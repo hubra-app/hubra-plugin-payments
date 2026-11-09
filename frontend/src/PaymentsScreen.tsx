@@ -8,7 +8,6 @@ import {
   EmptyState,
   ErrorBanner,
   LoadingSpinner,
-  PageHead,
   formatCHF,
   formatDateTime,
   useT,
@@ -118,7 +117,10 @@ function FeesCard({ acc, hubraPercent }: { acc: Account; hubraPercent: number })
   )
 }
 
-/** Einstellungen for the club's Stripe account, and its online payments. */
+/**
+ * Einstellungen for the club's Stripe account, and its online payments: a
+ * sub-tab of Finanzen › Einstellungen (/app/finance/online-payments).
+ */
 export function PaymentsScreen() {
   const { t } = useT()
   const { notify } = useToast()
@@ -153,7 +155,7 @@ export function PaymentsScreen() {
   const back = params.get('connected') || params.get('refresh')
   useEffect(() => {
     if (!back) return
-    doRefresh(true).then(() => navigate('/app/payments', { replace: true }))
+    doRefresh(true).then(() => navigate('/app/finance/online-payments', { replace: true }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [back])
 
@@ -188,8 +190,10 @@ export function PaymentsScreen() {
 
   return (
     <>
-      <PageHead title={t('payments.title')} desc={t('payments.desc')} />
       <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          {t('payments.desc')}
+        </Text>
         {!s.platform && (
           <Alert color="yellow" icon={<IconAlertTriangle size={18} />}>
             {t('payments.noPlatform')}

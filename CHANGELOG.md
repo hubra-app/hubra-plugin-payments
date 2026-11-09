@@ -1,5 +1,12 @@
 # Online payments
 
+## Unreleased
+
+- The Stripe set-up moved into Finanzen › Einstellungen › Online-Zahlungen
+  (`/app/finance/online-payments`), next to Bank & QR-Rechnung; the page
+  under Weitere is gone. `/app/payments` (and Stripe's return links to it)
+  opens the new place.
+
 ## 1.2.1
 
 1.2.0 was tagged but couldn't be signed, so it was never released. 1.2.1 is the same plugin, signed. What 1.2.0 brings:
