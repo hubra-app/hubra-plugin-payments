@@ -2,10 +2,20 @@
 
 ## Unreleased
 
-- The Stripe set-up moved into Finanzen › Einstellungen › Online-Zahlungen
-  (`/app/finance/online-payments`), next to Bank & QR-Rechnung; the page
-  under Weitere is gone. `/app/payments` (and Stripe's return links to it)
-  opens the new place.
+- Online payments moved into Finanzen: the list of payments is
+  Finanzen › Buchungen › Online-Zahlungen (`/app/finance/online-payments`),
+  the Stripe account and fees are Finanzen › Einstellungen › Online-Zahlungen
+  (`/app/finance/online-payments-settings`), Finanzen's last tab. The page
+  under Weitere is gone; `/app/payments` and `/app/payments/settings` (and
+  Stripe's return links to them) open the new places.
+
+## 1.3.0
+
+The page has two tabs: Zahlungen, the list of online payments, and
+Einstellungen (`/app/payments/settings`), with the club's Stripe account and
+who pays the fees. Coming back from Stripe's set-up opens Einstellungen. This
+follows Hubra's rule that a setting lives on the page it configures, in its
+last tab.
 ## 1.2.2
 
 1.2.1 was tagged but couldn't be signed, so it was never released. 1.2.2 is the same plugin, signed. What it brings:

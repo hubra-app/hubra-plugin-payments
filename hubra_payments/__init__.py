@@ -29,7 +29,8 @@ module = Module(
             "/api/v1/app/payments",
         ),
     ),
-    # No nav entry: the Stripe set-up is a tab of Finanzen › Einstellungen
+    # No nav entry: the payments are a sub-tab of Finanzen › Buchungen and the
+    # Stripe set-up one of Finanzen › Einstellungen
     # (frontend/src/index.tsx), next to Bank & QR-Rechnung.
     tables=("payments_account", "payments_checkouts"),
     tasks=("hubra_payments.tasks",),

@@ -17,7 +17,7 @@ income transaction like a bank payment would.
    Hubra fee in percent (Hubra's share of each payment; manage › All clubs ›
    club › Billing can set a club's own). Connect must be turned on in the platform's
    Stripe dashboard.
-2. **Club** (Weitere › Online-Zahlungen, permission
+2. **Club** (Finanzen › Einstellungen › Online-Zahlungen; the payments list is under Finanzen › Buchungen; permission
    `payments.account.manage`): **Stripe verbinden** creates the club's
    Stripe account and opens Stripe's setup, where the club enters its details
    and bank account. Back in Hubra the page shows whether Stripe allows
