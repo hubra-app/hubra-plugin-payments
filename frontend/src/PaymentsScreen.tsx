@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, Group, NumberInput, Paper, Radio, Stack, Table, Text, Title } from '@mantine/core'
-import { IconAlertTriangle, IconBrandStripe, IconRefresh } from '@tabler/icons-react'
+import { IconAlertTriangle, IconBrandStripe, IconList, IconRefresh, IconSettings } from '@tabler/icons-react'
 import {
   ConfirmModal,
   EmptyState,
   ErrorBanner,
   LoadingSpinner,
   PageHead,
+  Tabs,
   formatCHF,
   formatDateTime,
   useT,
@@ -118,11 +119,16 @@ function FeesCard({ acc, hubraPercent }: { acc: Account; hubraPercent: number })
   )
 }
 
-/** Einstellungen for the club's Stripe account, and its online payments. */
+/**
+ * Online payments: the list of payments, and the page's last tab
+ * Einstellungen with the club's Stripe account and who pays the fees.
+ */
 export function PaymentsScreen() {
   const { t } = useT()
   const { notify } = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const settings = location.pathname.endsWith('/payments/settings')
   const qc = useQueryClient()
   const [params] = useSearchParams()
   const status = useQuery({ queryKey: QK.status, queryFn: getStatus })
@@ -153,7 +159,7 @@ export function PaymentsScreen() {
   const back = params.get('connected') || params.get('refresh')
   useEffect(() => {
     if (!back) return
-    doRefresh(true).then(() => navigate('/app/payments', { replace: true }))
+    doRefresh(true).then(() => navigate('/app/payments/settings', { replace: true }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [back])
 
@@ -189,6 +195,14 @@ export function PaymentsScreen() {
   return (
     <>
       <PageHead title={t('payments.title')} desc={t('payments.desc')} />
+      <Tabs
+        tabs={[
+          { id: 'list', label: t('payments.listTitle'), icon: <IconList size={16} /> },
+          { id: 'settings', label: t('payments.tabs.settings'), icon: <IconSettings size={16} /> },
+        ]}
+        activeTab={settings ? 'settings' : 'list'}
+        onTabChange={(id) => navigate(id === 'settings' ? '/app/payments/settings' : '/app/payments')}
+      />
       <Stack gap="md">
         {!s.platform && (
           <Alert color="yellow" icon={<IconAlertTriangle size={18} />}>
@@ -196,149 +210,165 @@ export function PaymentsScreen() {
           </Alert>
         )}
 
-        <Paper withBorder p="lg">
-          <Group justify="space-between" align="flex-start" wrap="wrap" gap="md">
-            <Stack gap={6}>
-              <Group gap="xs">
-                <IconBrandStripe size={22} />
-                <Title order={3}>{acc?.name || t('payments.stripeAccount')}</Title>
-                {s.testMode && (
-                  <Badge color="orange" variant="light">
-                    {t('payments.testMode')}
-                  </Badge>
-                )}
-              </Group>
-              {!acc && <Text c="dimmed">{t('payments.notConnected')}</Text>}
-              {acc && (
-                <>
-                  <Text size="sm" c="dimmed">
-                    {acc.chargesEnabled
-                      ? t('payments.readyText')
-                      : acc.detailsSubmitted
-                        ? t('payments.reviewText')
-                        : t('payments.setupText')}
-                  </Text>
-                  <Group gap={6}>
-                    <Flag on={acc.chargesEnabled} label={t('payments.flag.charges')} />
-                    <Flag on={acc.card} label={t('payments.flag.card')} />
-                    <Flag on={acc.twint} label={t('payments.flag.twint')} />
+        {settings ? (
+          <>
+            <Paper withBorder p="lg">
+              <Group justify="space-between" align="flex-start" wrap="wrap" gap="md">
+                <Stack gap={6}>
+                  <Group gap="xs">
+                    <IconBrandStripe size={22} />
+                    <Title order={3}>{acc?.name || t('payments.stripeAccount')}</Title>
+                    {s.testMode && (
+                      <Badge color="orange" variant="light">
+                        {t('payments.testMode')}
+                      </Badge>
+                    )}
                   </Group>
-                  {acc.chargesEnabled && !acc.twint && (
+                  {!acc && <Text c="dimmed">{t('payments.notConnected')}</Text>}
+                  {acc && (
+                    <>
+                      <Text size="sm" c="dimmed">
+                        {acc.chargesEnabled
+                          ? t('payments.readyText')
+                          : acc.detailsSubmitted
+                            ? t('payments.reviewText')
+                            : t('payments.setupText')}
+                      </Text>
+                      <Group gap={6}>
+                        <Flag on={acc.chargesEnabled} label={t('payments.flag.charges')} />
+                        <Flag on={acc.card} label={t('payments.flag.card')} />
+                        <Flag on={acc.twint} label={t('payments.flag.twint')} />
+                      </Group>
+                      {acc.chargesEnabled && !acc.twint && (
+                        <Text size="xs" c="dimmed">
+                          {t('payments.twintHint')}
+                        </Text>
+                      )}
+                      <Text size="xs" c="dimmed">
+                        {acc.id}
+                        {acc.checkedAt ? ` · ${t('payments.checkedAt', { at: formatDateTime(acc.checkedAt) })}` : ''}
+                      </Text>
+                    </>
+                  )}
+                  {!!s.feePercent && (
                     <Text size="xs" c="dimmed">
-                      {t('payments.twintHint')}
+                      {t('payments.fee', { percent: String(s.feePercent) })}
                     </Text>
                   )}
-                  <Text size="xs" c="dimmed">
-                    {acc.id}
-                    {acc.checkedAt ? ` · ${t('payments.checkedAt', { at: formatDateTime(acc.checkedAt) })}` : ''}
-                  </Text>
-                </>
-              )}
-              {!!s.feePercent && (
-                <Text size="xs" c="dimmed">
-                  {t('payments.fee', { percent: String(s.feePercent) })}
-                </Text>
-              )}
-            </Stack>
-            <Group gap="xs">
-              {acc && (
-                <Button
-                  variant="default"
-                  leftSection={<IconRefresh size={16} />}
-                  loading={busy === 'refresh'}
-                  onClick={() => doRefresh()}
-                >
-                  {t('payments.check')}
-                </Button>
-              )}
-              {s.platform && (!acc || !acc.chargesEnabled) && (
-                <Button loading={busy === 'connect'} onClick={doConnect}>
-                  {acc ? t('payments.continueSetup') : t('payments.connect')}
-                </Button>
-              )}
-              {acc && (
-                <Button variant="subtle" color="red" onClick={() => setConfirmDisconnect(true)}>
-                  {t('payments.disconnect')}
-                </Button>
-              )}
-            </Group>
-          </Group>
-        </Paper>
+                </Stack>
+                <Group gap="xs">
+                  {acc && (
+                    <Button
+                      variant="default"
+                      leftSection={<IconRefresh size={16} />}
+                      loading={busy === 'refresh'}
+                      onClick={() => doRefresh()}
+                    >
+                      {t('payments.check')}
+                    </Button>
+                  )}
+                  {s.platform && (!acc || !acc.chargesEnabled) && (
+                    <Button loading={busy === 'connect'} onClick={doConnect}>
+                      {acc ? t('payments.continueSetup') : t('payments.connect')}
+                    </Button>
+                  )}
+                  {acc && (
+                    <Button variant="subtle" color="red" onClick={() => setConfirmDisconnect(true)}>
+                      {t('payments.disconnect')}
+                    </Button>
+                  )}
+                </Group>
+              </Group>
+            </Paper>
 
-        {acc && <FeesCard acc={acc} hubraPercent={s.feePercent ?? 0} />}
-
-        <Paper withBorder>
-          <Group p="md" style={{ borderBottom: '1px solid var(--hb-border)' }}>
-            <Text fw={700}>{t('payments.listTitle')}</Text>
-          </Group>
-          {checkouts.isLoading ? (
-            <LoadingSpinner />
-          ) : !checkouts.data?.length ? (
-            <EmptyState title={t('payments.emptyTitle')} description={t('payments.emptyDesc')} />
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table className="responsive-table">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('payments.col.date')}</Table.Th>
-                    <Table.Th>{t('payments.col.invoice')}</Table.Th>
-                    <Table.Th>{t('payments.col.member')}</Table.Th>
-                    <Table.Th>{t('payments.col.method')}</Table.Th>
-                    <Table.Th>{t('payments.col.status')}</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>{t('payments.col.amount')}</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {checkouts.data.map((c) => (
-                    <Table.Tr key={c.id}>
-                      <Table.Td data-label={t('payments.col.date')}>
-                        {formatDateTime(c.paidAt ?? c.createdAt ?? '')}
-                      </Table.Td>
-                      <Table.Td data-label={t('payments.col.invoice')}>
-                        {c.invoiceId ? (
-                          <Text
-                            component="a"
-                            href="#"
-                            size="sm"
-                            c="var(--mantine-color-acc-text)"
-                            onClick={(e: React.MouseEvent) => {
-                              e.preventDefault()
-                              navigate(`/app/finance/invoices/${c.invoiceId}`)
-                            }}
-                          >
-                            {c.invoiceId}
-                          </Text>
-                        ) : (
-                          '–'
-                        )}
-                      </Table.Td>
-                      <Table.Td data-label={t('payments.col.member')}>{c.memberName ?? '–'}</Table.Td>
-                      <Table.Td data-label={t('payments.col.method')}>
-                        {c.method ? t(`payments.method.${c.method}`, { defaultValue: c.method }) : '–'}
-                      </Table.Td>
-                      <Table.Td data-label={t('payments.col.status')}>
-                        <Badge
-                          variant="light"
-                          color={c.status === 'paid' ? 'green' : c.status === 'open' ? 'yellow' : 'gray'}
-                        >
-                          {t(`payments.state.${c.status}`)}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td data-label={t('payments.col.amount')} style={{ textAlign: 'right' }} className="num">
-                        CHF {formatCHF(c.amount)}
-                        {c.surcharge > 0 && (
-                          <Text size="xs" c="dimmed">
-                            {t('payments.inclFee', { fee: formatCHF(c.surcharge) })}
-                          </Text>
-                        )}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </div>
-          )}
-        </Paper>
+            {acc && <FeesCard acc={acc} hubraPercent={s.feePercent ?? 0} />}
+          </>
+        ) : (
+          <>
+            {!acc?.chargesEnabled && (
+              <Alert color="blue" variant="light">
+                <Group justify="space-between" gap="sm">
+                  <Text size="sm">{t('payments.setupFirst')}</Text>
+                  <Button size="xs" variant="default" onClick={() => navigate('/app/payments/settings')}>
+                    {t('payments.tabs.settings')}
+                  </Button>
+                </Group>
+              </Alert>
+            )}
+            <Paper withBorder>
+              <Group p="md" style={{ borderBottom: '1px solid var(--hb-border)' }}>
+                <Text fw={700}>{t('payments.listTitle')}</Text>
+              </Group>
+              {checkouts.isLoading ? (
+                <LoadingSpinner />
+              ) : !checkouts.data?.length ? (
+                <EmptyState title={t('payments.emptyTitle')} description={t('payments.emptyDesc')} />
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <Table className="responsive-table">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>{t('payments.col.date')}</Table.Th>
+                        <Table.Th>{t('payments.col.invoice')}</Table.Th>
+                        <Table.Th>{t('payments.col.member')}</Table.Th>
+                        <Table.Th>{t('payments.col.method')}</Table.Th>
+                        <Table.Th>{t('payments.col.status')}</Table.Th>
+                        <Table.Th style={{ textAlign: 'right' }}>{t('payments.col.amount')}</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {checkouts.data.map((c) => (
+                        <Table.Tr key={c.id}>
+                          <Table.Td data-label={t('payments.col.date')}>
+                            {formatDateTime(c.paidAt ?? c.createdAt ?? '')}
+                          </Table.Td>
+                          <Table.Td data-label={t('payments.col.invoice')}>
+                            {c.invoiceId ? (
+                              <Text
+                                component="a"
+                                href="#"
+                                size="sm"
+                                c="var(--mantine-color-acc-text)"
+                                onClick={(e: React.MouseEvent) => {
+                                  e.preventDefault()
+                                  navigate(`/app/finance/invoices/${c.invoiceId}`)
+                                }}
+                              >
+                                {c.invoiceId}
+                              </Text>
+                            ) : (
+                              '–'
+                            )}
+                          </Table.Td>
+                          <Table.Td data-label={t('payments.col.member')}>{c.memberName ?? '–'}</Table.Td>
+                          <Table.Td data-label={t('payments.col.method')}>
+                            {c.method ? t(`payments.method.${c.method}`, { defaultValue: c.method }) : '–'}
+                          </Table.Td>
+                          <Table.Td data-label={t('payments.col.status')}>
+                            <Badge
+                              variant="light"
+                              color={c.status === 'paid' ? 'green' : c.status === 'open' ? 'yellow' : 'gray'}
+                            >
+                              {t(`payments.state.${c.status}`)}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td data-label={t('payments.col.amount')} style={{ textAlign: 'right' }} className="num">
+                            CHF {formatCHF(c.amount)}
+                            {c.surcharge > 0 && (
+                              <Text size="xs" c="dimmed">
+                                {t('payments.inclFee', { fee: formatCHF(c.surcharge) })}
+                              </Text>
+                            )}
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </div>
+              )}
+            </Paper>
+          </>
+        )}
       </Stack>
 
       <ConfirmModal

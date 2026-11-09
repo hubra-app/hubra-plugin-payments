@@ -9,6 +9,8 @@ registerPlugin({
   id: 'payments',
   routes: [
     { path: 'payments', module: 'payments', perm: 'payments.account.manage', component: PaymentsScreen },
+    // The page's last tab, Einstellungen: the Stripe account and the fees.
+    { path: 'payments/settings', module: 'payments', perm: 'payments.account.manage', component: PaymentsScreen },
     // Every member comes back here from Stripe.
     { path: 'payments/return', module: 'payments', component: ReturnScreen },
   ],
