@@ -7,6 +7,16 @@ Einstellungen (`/app/payments/settings`), with the club's Stripe account and
 who pays the fees. Coming back from Stripe's set-up opens Einstellungen. This
 follows Hubra's rule that a setting lives on the page it configures, in its
 last tab.
+## 1.2.2
+
+1.2.1 was tagged but couldn't be signed, so it was never released. 1.2.2 is the same plugin, signed. What it brings:
+
+Changed: the club's connected Stripe account belongs to one Stripe mode.
+Hubra now has a sandbox and a live key (and sandbox clubs that always use
+the sandbox); an account connected in the sandbox isn't used once the club
+runs live, and the other way round. After going live the club connects its
+Stripe account once more. Open checkouts are only checked with the key of
+their account's mode.
 
 ## 1.2.1
 
