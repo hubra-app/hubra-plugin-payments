@@ -18,6 +18,9 @@ from hubra.core.modules import Blueprint, Module, Schedule
 
 module = Module(
     code="payments",
+    # Access the standard roles get when a club first switches it on
+    # (docs/roles.md in hubra-app/hubra).
+    role_defaults={"treasurer": "all"},
     name="Online payments",
     description="Members pay invoices online by card or TWINT (Stripe)",
     default_enabled=False,
