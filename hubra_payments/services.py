@@ -89,6 +89,8 @@ def cents(amount: Decimal | float | int | str) -> int:
 # Limits for what a club enters as its Stripe rate.
 MAX_SURCHARGE_PERCENT = Decimal("10")
 MAX_SURCHARGE_FIXED = Decimal("5")
+# The club's rate plus the Hubra fee must stay below this to be passed on.
+MAX_TOTAL_PERCENT = Decimal("50")
 
 
 def _fee(total: int, percent: Decimal) -> int:
@@ -114,6 +116,14 @@ def price(amount: int, acc: PaymentAccount | None, hubra_percent) -> tuple[int, 
     fixed = cents(acc.surcharge_fixed or 0)
     if pct <= 0 and fixed <= 0:
         return amount, 0
+    if pct >= MAX_TOTAL_PERCENT:
+        # A rate this high can't be grossed up (it would divide by zero or
+        # flip the sign); refuse rather than charge something odd.
+        raise PaymentError(
+            "FEES_TOO_HIGH",
+            "The fees set for online payments are too high to pass on.",
+            409,
+        )
     total = int(
         (Decimal(amount + fixed) / (1 - pct / 100)).to_integral_value(
             rounding=ROUND_CEILING
@@ -265,20 +275,64 @@ def disconnect(member) -> None:
 # ── Checkout ─────────────────────────────────────────────────────────────────
 
 
-def _reusable(invoice: Invoice, amount: int) -> PaymentCheckout | None:
-    chk = db.session.scalar(
-        select(PaymentCheckout)
-        .where(PaymentCheckout.invoice_id == invoice.id)
-        .where(PaymentCheckout.status == "open")
-        .order_by(PaymentCheckout.id.desc())
+def _open_checkouts(invoice: Invoice) -> list[PaymentCheckout]:
+    return list(
+        db.session.scalars(
+            select(PaymentCheckout)
+            .where(PaymentCheckout.invoice_id == invoice.id)
+            .where(PaymentCheckout.status == "open")
+            .order_by(PaymentCheckout.id.desc())
+        )
     )
-    # Same total: a changed invoice or fee setting gets a new checkout.
-    if chk is None or cents(chk.amount) != amount or not chk.url:
+
+
+def _reusable(
+    chk: PaymentCheckout | None, amount: int, member
+) -> PaymentCheckout | None:
+    # Same total and same member: a changed invoice or fee setting gets a
+    # new checkout.
+    if (
+        chk is None
+        or cents(chk.amount) != amount
+        or chk.member_id != getattr(member, "id", None)
+        or not chk.url
+    ):
         return None
     expires = _aware(chk.expires_at)
     if expires is None or expires - _now() < REUSE_MARGIN:
         return None
     return chk
+
+
+def _end_superseded(chks: list[PaymentCheckout], secret_key: str) -> None:
+    """End the invoice's older open checkouts at Stripe before a new one is
+    made, so the member can't pay the same invoice twice (or an old, lower
+    amount). One Stripe won't end may already be paid or still be
+    processing (TWINT): then no new checkout is made."""
+    for chk in chks:
+        try:
+            stripe_api.expire_checkout(
+                secret_key, chk.stripe_account_id, chk.session_id
+            )
+        except StripeError as exc:
+            _log.info("payments: could not end checkout %s: %s", chk.id, exc)
+            try:
+                state = sync(chk)
+            except StripeError:
+                state = chk.status
+            if state == "paid":
+                raise PaymentError(
+                    "INVOICE_PAID", "This invoice is already paid.", 409
+                ) from None
+            if state == "open":
+                raise PaymentError(
+                    "PAYMENT_PENDING",
+                    "A payment for this invoice is still being processed. "
+                    "Please try again in a few minutes.",
+                    409,
+                ) from None
+            continue
+        chk.status = "expired"
 
 
 def start_checkout(invoice: Invoice, member) -> PaymentCheckout:
@@ -296,9 +350,11 @@ def start_checkout(invoice: Invoice, member) -> PaymentCheckout:
             "AMOUNT_TOO_SMALL", "Online payments start at CHF 0.50.", 400
         )
     total, surcharge = price(amount, acc, p.fee_percent)
-    reuse = _reusable(invoice, total)
+    open_chks = _open_checkouts(invoice)
+    reuse = _reusable(open_chks[0] if open_chks else None, total, member)
     if reuse is not None:
         return reuse
+    _end_superseded(open_chks, p.secret_key)
 
     # The Hubra fee is a share of what the member pays.
     fee = _fee(total, Decimal(str(p.fee_percent)))
@@ -398,6 +454,31 @@ def _method(session: dict) -> str | None:
     return None
 
 
+def _still_matches(chk: PaymentCheckout, invoice: Invoice) -> bool:
+    """The invoice is still what the member paid for: same member, same
+    amount (the checkout's total less the surcharge)."""
+    paid_for = cents(chk.amount) - cents(chk.surcharge or 0)
+    return invoice.member_id == chk.member_id and cents(invoice.amount) == paid_for
+
+
+def _notify_mismatch(chk: PaymentCheckout) -> None:
+    """Tell the people who look after online payments (the treasurer) that
+    money came in for an invoice that changed since, so they settle it."""
+    from hubra.core.notifications.staff import notify_permitted
+
+    try:
+        notify_permitted(
+            "payments.account.manage",
+            "warning",
+            "Online payment needs a check",
+            f"Invoice {chk.invoice_id}: CHF {chk.amount} paid online, but the "
+            "invoice changed after the payment started. It is still open.",
+            link="/app/finance/online-payments",
+        )
+    except Exception:  # a failed notice must not undo the payment record
+        _log.exception("payments: could not notify about checkout %s", chk.id)
+
+
 def apply_session(chk: PaymentCheckout, session: dict) -> str:
     """Bring a checkout (and its invoice) up to what Stripe says."""
     if chk.status != "open":
@@ -419,6 +500,29 @@ def apply_session(chk: PaymentCheckout, session: dict) -> str:
         chk.paid_at = _now()
         chk.method = _method(session)
         invoice = db.session.get(Invoice, chk.invoice_id) if chk.invoice_id else None
+        if (
+            invoice is not None
+            and invoice.status != "Paid"
+            and not _still_matches(chk, invoice)
+        ):
+            # The invoice changed after the checkout was made (another amount
+            # or member): the money is in, but a person decides about the
+            # invoice.
+            _log.warning(
+                "payments: checkout %s paid, invoice %s changed since; not booked",
+                chk.id,
+                invoice.id,
+            )
+            log_audit(
+                chk.member_id,
+                "payments.paid_mismatch",
+                "invoice",
+                chk.invoice_id,
+                f"Rechnung {chk.invoice_id}: CHF {chk.amount} online bezahlt, "
+                "die Rechnung wurde seither geändert; bitte prüfen",
+            )
+            _notify_mismatch(chk)
+            return chk.status
         if invoice is not None and invoice.status != "Paid":
             from hubra.core.contracts import SYSTEM, call
 
@@ -455,6 +559,9 @@ def sync(chk: PaymentCheckout) -> str:
         if exc.status == 404 and _now() - _aware(chk.created_at) > GIVE_UP:
             chk.status = "expired"
         raise
+    # The return page and the scheduler can ask at the same time: only one
+    # of them books the payment.
+    db.session.refresh(chk, with_for_update=True)
     return apply_session(chk, session)
 
 

@@ -12,6 +12,8 @@ POST   /checkouts/confirm           member back from Stripe: {sessionId}
 
 from __future__ import annotations
 
+import logging
+
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
@@ -31,12 +33,24 @@ from .models import PaymentCheckout
 from .stripe_api import StripeError
 
 payments_bp = Blueprint("payments_bp", __name__)
+_log = logging.getLogger(__name__)
 
 MANAGE = "payments.account.manage"
 
 
 def _stripe_failed(exc: StripeError):
     return api_error("STRIPE_ERROR", str(exc), 502)
+
+
+def _stripe_failed_member(exc: StripeError):
+    """Members don't get Stripe's own text (it can name the platform's
+    account or key ending); it goes to the log instead."""
+    _log.warning("payments: Stripe call failed: %s", exc)
+    return api_error(
+        "STRIPE_ERROR",
+        "The payment service could not be reached. Please try again later.",
+        502,
+    )
 
 
 def _payment_failed(exc: services.PaymentError):
@@ -178,10 +192,11 @@ def checkout(invoice_id: int):
     try:
         chk = services.start_checkout(invoice, member)
     except services.PaymentError as exc:
+        db.session.commit()  # keeps checkouts found paid or ended on the way
         return _payment_failed(exc)
     except StripeError as exc:
         db.session.rollback()
-        return _stripe_failed(exc)
+        return _stripe_failed_member(exc)
     db.session.commit()
     return jsonify({"url": chk.url, "checkoutId": chk.id}), 200
 
@@ -200,7 +215,7 @@ def confirm():
         state = services.sync(chk)
     except StripeError as exc:
         db.session.commit()
-        return _stripe_failed(exc)
+        return _stripe_failed_member(exc)
     db.session.commit()
     return jsonify(
         {"status": state, "invoiceId": chk.invoice_id, "amount": float(chk.amount)}

@@ -3,6 +3,19 @@
 ## Unreleased
 
 - The hint for platform operators points at Manage › Dienste › Zahlungen.
+- Security: a new checkout for an invoice first ends the invoice's older open
+  ones at Stripe, so a member can't pay the same invoice twice or an old,
+  lower amount. While an older one is still being processed (TWINT), no new
+  one is made (`PAYMENT_PENDING`).
+- Security: a payment is only booked on the invoice while the invoice still
+  has the amount and the member it had when the checkout was made; otherwise
+  the payment is listed as paid, the audit log asks for a check and whoever
+  manages online payments (the treasurer) gets a notification.
+- Security: the return page and the 10-minute job can't book the same
+  payment twice (the checkout row is locked while it is booked).
+- Security: members see a plain message when Stripe fails, not Stripe's own
+  text; fees too high to pass on are refused instead of producing a negative
+  or endless total.
 
 ## 1.4.0
 
