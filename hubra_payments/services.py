@@ -461,6 +461,24 @@ def _still_matches(chk: PaymentCheckout, invoice: Invoice) -> bool:
     return invoice.member_id == chk.member_id and cents(invoice.amount) == paid_for
 
 
+def _notify_mismatch(chk: PaymentCheckout) -> None:
+    """Tell the people who look after online payments (the treasurer) that
+    money came in for an invoice that changed since, so they settle it."""
+    from hubra.core.notifications.staff import notify_permitted
+
+    try:
+        notify_permitted(
+            "payments.account.manage",
+            "warning",
+            "Online payment needs a check",
+            f"Invoice {chk.invoice_id}: CHF {chk.amount} paid online, but the "
+            "invoice changed after the payment started. It is still open.",
+            link="/app/finance/online-payments",
+        )
+    except Exception:  # a failed notice must not undo the payment record
+        _log.exception("payments: could not notify about checkout %s", chk.id)
+
+
 def apply_session(chk: PaymentCheckout, session: dict) -> str:
     """Bring a checkout (and its invoice) up to what Stripe says."""
     if chk.status != "open":
@@ -503,6 +521,7 @@ def apply_session(chk: PaymentCheckout, session: dict) -> str:
                 f"Rechnung {chk.invoice_id}: CHF {chk.amount} online bezahlt, "
                 "die Rechnung wurde seither geändert; bitte prüfen",
             )
+            _notify_mismatch(chk)
             return chk.status
         if invoice is not None and invoice.status != "Paid":
             from hubra.core.contracts import SYSTEM, call

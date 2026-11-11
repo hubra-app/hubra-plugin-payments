@@ -130,7 +130,7 @@ def club(client, app, db, seeded_db, stripe):
         }
     )
     tier = seeded_db["tier"]
-    _make_role_and_member(db, tier, name="Tina", permission_keys=MANAGE)
+    tina = _make_role_and_member(db, tier, name="Tina", permission_keys=MANAGE)
     mia = _make_role_and_member(db, tier, name="Mia", permission_keys=[])
     other = _make_role_and_member(db, tier, name="Otto", permission_keys=[])
     today = date.today()
@@ -145,7 +145,7 @@ def club(client, app, db, seeded_db, stripe):
     )
     db.session.add(inv)
     db.session.commit()
-    return {"invoice": inv.id, "mia": mia.id, "other": other.id}
+    return {"invoice": inv.id, "mia": mia.id, "other": other.id, "tina": tina.id}
 
 
 def _connect(client, stripe):
@@ -370,6 +370,16 @@ def test_an_old_checkout_paid_after_the_invoice_changed_is_not_booked(
         db.select(PaymentCheckout).where(PaymentCheckout.session_id == "cs_test_1")
     )
     assert chk.status == "paid"
+    # Tina (manages online payments) is told; Mia isn't.
+    from hubra.core.models.notification import Notification
+
+    notes = db.session.scalars(
+        db.select(Notification).where(
+            Notification.title == "Online payment needs a check"
+        )
+    ).all()
+    assert club["tina"] in {n.member_id for n in notes}
+    assert club["mia"] not in {n.member_id for n in notes}
 
 
 def test_no_second_checkout_while_one_is_processing(client, club, stripe, db):
