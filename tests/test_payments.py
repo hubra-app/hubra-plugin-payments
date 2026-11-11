@@ -36,6 +36,8 @@ class FakeStripe:
             "business_profile": {"name": "FC Test"},
         }
         self.sessions: dict[str, dict] = {}
+        # Sessions Stripe won't end (paid or still processing).
+        self.unexpirable: set[str] = set()
 
     def finish_onboarding(self):
         self.account.update(
@@ -87,6 +89,8 @@ class FakeStripe:
             if sid not in self.sessions:
                 return 404, b'{"error": {"message": "No such session"}}'
             if path.endswith("/expire"):
+                if sid in self.unexpirable or self.sessions[sid]["status"] != "open":
+                    return 400, b'{"error": {"message": "Session is not open"}}'
                 self.sessions[sid]["status"] = "expired"
             return 200, json.dumps(self.sessions[sid]).encode()
         return 404, b'{"error": {"message": "unknown"}}'
@@ -174,7 +178,9 @@ def test_connect_then_refresh(client, club, stripe):
     assert created["headers"]["Authorization"] == "Bearer sk_test_abcdefghijklmnop"
     link = stripe.calls[1]["form"]
     assert link["account"] == "acct_club"
-    assert link["return_url"].endswith("/app/finance/online-payments-settings?connected=1")
+    assert link["return_url"].endswith(
+        "/app/finance/online-payments-settings?connected=1"
+    )
 
     st = client.get(f"{BASE}/status").get_json()
     assert st["account"]["chargesEnabled"] is False and st["ready"] is False
@@ -296,9 +302,7 @@ def test_the_job_books_payments_and_ends_old_checkouts(client, club, stripe, db)
     assert db.session.get(PaymentCheckout, stale.id).status == "expired"
 
 
-def test_an_account_belongs_to_one_stripe_mode(
-    client, club, stripe, db, monkeypatch
-):
+def test_an_account_belongs_to_one_stripe_mode(client, club, stripe, db, monkeypatch):
     """Connected with the sandbox key, the account isn't used once the
     platform runs live, and its checkouts wait for the sandbox again."""
     from hubra.core.services import platform_settings
@@ -320,9 +324,7 @@ def test_an_account_belongs_to_one_stripe_mode(
     calls = len(stripe.calls)
     _login(client, "tina@test.ch")
     client.post(f"{BASE}/connect")
-    assert stripe.calls[calls]["headers"]["Authorization"].startswith(
-        "Bearer sk_live_"
-    )
+    assert stripe.calls[calls]["headers"]["Authorization"].startswith("Bearer sk_live_")
     assert services.account().livemode is True
 
     monkeypatch.undo()
@@ -341,6 +343,88 @@ def test_a_changed_amount_gets_a_new_checkout(client, club, stripe, db):
     client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
     assert len(stripe.sessions) == 2
     assert stripe.calls[-1]["form"]["line_items[0][price_data][unit_amount]"] == "8000"
+    # The old checkout is ended, so the member can't pay twice.
+    assert stripe.sessions["cs_test_1"]["status"] == "expired"
+
+
+def test_an_old_checkout_paid_after_the_invoice_changed_is_not_booked(
+    client, club, stripe, db
+):
+    """A checkout for CHF 120 paid after the invoice went up to CHF 500
+    does not mark the CHF 500 invoice paid."""
+    from hubra.core.models.finance import Invoice
+    from hubra_payments.models import PaymentCheckout
+
+    _connect(client, stripe)
+    _login(client, "mia@test.ch")
+    client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    inv = db.session.get(Invoice, club["invoice"])
+    inv.amount = Decimal("500.00")
+    db.session.commit()
+    stripe.pay("cs_test_1")
+    ok = client.post(f"{BASE}/checkouts/confirm", json={"sessionId": "cs_test_1"})
+    assert ok.get_json()["status"] == "paid"
+    db.session.expire_all()
+    assert db.session.get(Invoice, club["invoice"]).status == "Open"
+    chk = db.session.scalar(
+        db.select(PaymentCheckout).where(PaymentCheckout.session_id == "cs_test_1")
+    )
+    assert chk.status == "paid"
+
+
+def test_no_second_checkout_while_one_is_processing(client, club, stripe, db):
+    from hubra.core.models.finance import Invoice
+
+    _connect(client, stripe)
+    _login(client, "mia@test.ch")
+    client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    stripe.unexpirable.add("cs_test_1")
+    inv = db.session.get(Invoice, club["invoice"])
+    inv.amount = Decimal("80.00")
+    db.session.commit()
+    r = client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    assert r.status_code == 409 and r.get_json()["error"] == "PAYMENT_PENDING"
+    assert len(stripe.sessions) == 1
+
+    # Paid in the meantime: the member is told, no new checkout.
+    stripe.pay("cs_test_1")
+    inv = db.session.get(Invoice, club["invoice"])
+    inv.amount = Decimal("90.00")
+    db.session.commit()
+    r = client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    assert r.status_code == 409 and r.get_json()["error"] == "INVOICE_PAID"
+    assert len(stripe.sessions) == 1
+
+
+def test_fees_that_cannot_be_grossed_up_are_refused():
+    from hubra_payments import services
+    from hubra_payments.models import PaymentAccount
+
+    acc = PaymentAccount(
+        pass_fees=True, surcharge_percent=Decimal("10"), surcharge_fixed=Decimal("0")
+    )
+    assert services.price(12000, acc, 5)[0] > 12000
+    with pytest.raises(services.PaymentError) as exc:
+        services.price(12000, acc, 95)
+    assert exc.value.code == "FEES_TOO_HIGH"
+
+
+def test_members_do_not_see_stripe_messages(client, club, stripe, monkeypatch):
+    from hubra_payments import stripe_api
+
+    _connect(client, stripe)
+    monkeypatch.setattr(
+        stripe_api,
+        "_send",
+        lambda *a: (
+            401,
+            b'{"error": {"message": "Invalid API Key provided: sk_test_****mnop"}}',
+        ),
+    )
+    _login(client, "mia@test.ch")
+    r = client.post(f"{BASE}/invoices/{club['invoice']}/checkout")
+    assert r.status_code == 502
+    assert "sk_" not in r.get_json()["message"]
 
 
 def test_members_can_pay_the_fees(client, club, stripe, db):
