@@ -1,5 +1,7 @@
 # Online payments (Hubra plugin)
 
+[![Test and release](https://github.com/hubra-app/hubra-plugin-payments/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/hubra-app/hubra-plugin-payments/actions/workflows/release.yml?query=branch%3Amain) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-bitsandbricks-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/bitsandbricks)
+
 Members pay their invoices online, by card or TWINT. Each club connects its
 **own Stripe account** to the platform's (Stripe Connect, a Standard
 account): the money goes straight to the club, Stripe takes its fees from
