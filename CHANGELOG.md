@@ -1,6 +1,6 @@
 # Online payments
 
-## Unreleased
+## 1.4.1
 
 - The hint for platform operators points at Manage › Dienste › Zahlungen.
 - Security: a new checkout for an invoice first ends the invoice's older open
